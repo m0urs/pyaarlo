@@ -23,6 +23,7 @@ from .constant import (
     MODEL_PRO_4,
     MODEL_WIRED_VIDEO_DOORBELL,
     MODEL_WIREFREE_VIDEO_DOORBELL,
+    MODEL_GO,
     PING_CAPABILITY,
     REFRESH_CAMERA_DELAY,
     SLOW_REFRESH_INTERVAL,
@@ -38,7 +39,7 @@ from .util import time_to_arlotime
 
 _LOGGER = logging.getLogger("pyaarlo")
 
-__version__ = "0.7.1b9"
+__version__ = "0.8.0a6"
 
 
 class PyArlo(object):
@@ -116,10 +117,6 @@ class PyArlo(object):
       returned. Default is `arlo`.
     * **mode_api** - Which api to use to set the base station modes. Default is `auto` which choose an API
       based on camera model. Can also be `v1` and `v2`.
-    * **http_connections** - HTTP connection pool size. Default is `20`, set to `None` to default provided
-      by the system.
-    * **http_max_size** - HTTP maximum connection pool size. Default is `10`, set to `None` to default provided
-      by the system.
     * **reconnect_every** - Time, in minutes, to close and relogin to Arlo.
     * **snapshot_timeout** - Time, in seconds, to stop the snapshot attempt and return the camera to the idle state.
 
@@ -139,6 +136,9 @@ class PyArlo(object):
 
     def __init__(self, **kwargs):
         """Constructor for the PyArlo object."""
+        # get this out quick
+        self.info(f"pyarlo {__version__} starting...")
+
         # core values
         self._last_error = None
 
@@ -146,11 +146,12 @@ class PyArlo(object):
         self._cfg = ArloCfg(self, **kwargs)
 
         # Create storage/scratch directory.
-        if self._cfg.state_file is not None or self._cfg.dump_file is not None:
+        if self._cfg.save_state or self._cfg.dump or self._cfg.save_session:
             try:
-                os.mkdir(self._cfg.storage_dir)
+                if not os.path.exists(self._cfg.storage_dir):
+                    os.mkdir(self._cfg.storage_dir)
             except Exception:
-                pass
+                self.warning(f"Problem creating {self._cfg.storage_dir}")
 
         # Create remaining components.
         self._bg = ArloBackground(self)
@@ -197,6 +198,7 @@ class PyArlo(object):
             if (
                 dtype == "basestation"
                 or device.get("modelId") == "ABC1000"
+                or device.get("modelId").startswith(MODEL_GO)
                 or dtype == "arloq"
                 or dtype == "arloqs"
             ):
@@ -220,6 +222,7 @@ class PyArlo(object):
                 dtype == "camera"
                 or dtype == "arloq"
                 or dtype == "arloqs"
+                or device.get("modelId").startswith(MODEL_GO)
                 or device.get("modelId").startswith(MODEL_WIRED_VIDEO_DOORBELL)
                 or device.get("modelId").startswith(MODEL_WIREFREE_VIDEO_DOORBELL)
             ):
@@ -287,12 +290,12 @@ class PyArlo(object):
         self.vdebug("devices={}".format(pprint.pformat(self._devices)))
 
     def _refresh_camera_thumbnails(self, wait=False):
-        """Request latest camera thumbnails, called at start up. """
+        """Request latest camera thumbnails, called at start up."""
         for camera in self._cameras:
             camera.update_last_image(wait)
 
     def _refresh_camera_media(self, wait=False):
-        """Rebuild cameras media library, called at start up or when day changes. """
+        """Rebuild cameras media library, called at start up or when day changes."""
         for camera in self._cameras:
             camera.update_media(wait)
 
@@ -337,6 +340,7 @@ class PyArlo(object):
     def _refresh_modes(self):
         self.vdebug("refresh modes")
         for base in self._bases:
+            base.update_modes()
             base.update_mode()
 
     def _fast_refresh(self):
@@ -399,7 +403,7 @@ class PyArlo(object):
             self._lock.notify_all()
 
     def stop(self):
-        """Stop connection to Arlo and logout. """
+        """Stop connection to Arlo and logout."""
         self._st.save()
         self._be.logout()
 

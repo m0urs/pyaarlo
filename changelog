@@ -1,3 +1,17 @@
+0.8.0a6: Fixed schedule handling.
+         Handle events in the background thread.
+0.8.0a5: Update token to map to email address
+         Save last video details
+         Don't signal unless information has really changed
+0.8.0a4: Add GO camera support.
+         Fixed header issue.
+0.8.0a3: Save authentication token.
+0.8.0a2: Support quoted printable in Arlo 2fa emails
+         Fix connected capability for video door bell.
+0.8.0a1: New version after split from hass-aarlo.
+
+0.7.1b13: Merge to hass-aarlo b13
+0.7.1b11: Merge to hass-aarlo b11
 0.7.1b9: Add cloudscraper support.
 0.7.1b7: Allow removal of unicode characters from entity ids
         Siren on wired doorbell.
